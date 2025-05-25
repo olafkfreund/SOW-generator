@@ -1,0 +1,17 @@
+Simple Project Requirements
+
+Project: Basic Web Application
+Timeline: 4 weeks  
+Budget: $50,000
+
+Requirements:
+- Create a simple web interface
+- Implement user authentication
+- Add basic CRUD operations
+- Deploy to cloud platform
+
+Technology Stack:
+- Frontend: React
+- Backend: Node.js
+- Database: PostgreSQL
+- Hosting: AWS

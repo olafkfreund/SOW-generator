@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sow-template-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sow-template-service
+  template:
+    metadata:
+      labels:
+        app: sow-template-service
+    spec:
+      containers:
+        - name: backend
+          image: sow-backend:latest
+          ports:
+            - containerPort: 4000
+        - name: frontend
+          image: sow-frontend:latest
+          ports:
+            - containerPort: 80
+        - name: ollama
+          image: ollama-amd:latest # or ollama-nvidia:latest
+          ports:
+            - containerPort: 11434
+          env:
+            - name: OLLAMA_PORT
+              value: "11434"
+            - name: OLLAMA_GPU
+              value: "amd" # or "nvidia"

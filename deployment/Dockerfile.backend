@@ -1,0 +1,8 @@
+# Backend Dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY backend/package.json backend/tsconfig.json ./
+COPY backend/src ./src
+RUN npm install && npm run build
+EXPOSE 4000
+CMD ["npm", "start"]

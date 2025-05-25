@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1",
+    "engineerId": "1",
+    "date": "2025-06-01",
+    "type": "vacation",
+    "description": "Summer vacation"
+  },
+  {
+    "id": "2",
+    "engineerId": "2", 
+    "date": "2025-06-03",
+    "type": "sick",
+    "description": "Medical appointment"
+  }
+]

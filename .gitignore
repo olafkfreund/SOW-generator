@@ -1,0 +1,43 @@
+# Node
+node_modules/
+dist/
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Mac/Linux
+.DS_Store
+*.swp
+
+# VSCode
+.vscode/
+
+# Build
+frontend/build/
+backend/build/
+
+# Test coverage
+coverage/
+
+# Docker
+*.local
+
+# Ollama
+ollama/
+
+# Nix
+result/
+.cache/
+.devenv/
+
+# Misc
+uploads/
+*.log
+*.pid
+
+# Ignore generated files
+frontend/README.old.md

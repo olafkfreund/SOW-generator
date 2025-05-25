@@ -1,0 +1,7 @@
+# Ollama Dockerfile (Nvidia GPU)
+# Placeholder: Replace with actual Ollama Nvidia GPU Dockerfile instructions
+FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+# Install Ollama and Nvidia CUDA drivers here
+# Expose Ollama port (e.g., 11434)
+EXPOSE 11434
+CMD ["ollama", "serve", "--port", "11434"]

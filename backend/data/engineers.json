@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1",
+    "name": "Alice Smith",
+    "role": "Cloud Engineer",
+    "hourlyRate": 150,
+    "availability": "Full-time"
+  },
+  {
+    "id": "2", 
+    "name": "Bob Lee",
+    "role": "DevOps Engineer",
+    "hourlyRate": 140,
+    "availability": "Part-time"
+  }
+]

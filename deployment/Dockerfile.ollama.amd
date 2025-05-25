@@ -1,0 +1,7 @@
+# Ollama Dockerfile (AMD GPU)
+# Placeholder: Replace with actual Ollama AMD GPU Dockerfile instructions
+FROM ubuntu:22.04
+# Install Ollama and AMD ROCm drivers here
+# Expose Ollama port (e.g., 11434)
+EXPOSE 11434
+CMD ["ollama", "serve", "--port", "11434"]

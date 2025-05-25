@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1",
+    "service": "Azure Deployment",
+    "price": 5000,
+    "unit": "project",
+    "description": "Complete Azure cloud deployment"
+  },
+  {
+    "id": "2",
+    "service": "GCP Deployment", 
+    "price": 4800,
+    "unit": "project",
+    "description": "Complete GCP cloud deployment"
+  },
+  {
+    "id": "3",
+    "service": "AWS Deployment",
+    "price": 5200,
+    "unit": "project", 
+    "description": "Complete AWS cloud deployment"
+  }
+]

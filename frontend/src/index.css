@@ -1,0 +1,16 @@
+/* Import the Gruvbox theme */
+@import './theme.css';
+
+/* Global font imports */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Reset and base styles are handled in theme.css */
+body {
+  margin: 0;
+  /* Font family is set in theme.css */
+}
+
+code {
+  /* Font family is set in theme.css */
+}
