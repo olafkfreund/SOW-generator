@@ -1,0 +1,366 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-nvidia
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: nvidia
+    component: ai-inference
+spec:
+  replicas: 1  # Single instance for GPU workload
+  strategy:
+    type: Recreate  # Ensure only one instance runs at a time
+  selector:
+    matchLabels:
+      app: ollama
+      gpu-type: nvidia
+  template:
+    metadata:
+      labels:
+        app: ollama
+        gpu-type: nvidia
+        component: ai-inference
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "11434"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sow-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      - key: gpu-workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      containers:
+      - name: ollama
+        image: ollama-nvidia:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 11434
+          name: http
+          protocol: TCP
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0:11434"
+        - name: OLLAMA_MODELS
+          value: "/models"
+        - name: OLLAMA_KEEP_ALIVE
+          value: "24h"
+        - name: OLLAMA_MAX_LOADED_MODELS
+          value: "3"
+        - name: OLLAMA_NUM_PARALLEL
+          value: "4"
+        - name: OLLAMA_MAX_QUEUE
+          value: "512"
+        # NVIDIA GPU specific environment variables
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "all"
+        - name: CUDA_CACHE_PATH
+          value: "/tmp/cuda-cache"
+        - name: NVIDIA_REQUIRE_CUDA
+          value: "cuda>=12.0"
+        - name: CUDA_DEVICE_ORDER
+          value: "PCI_BUS_ID"
+        - name: GPU_MEMORY_FRACTION
+          value: "0.9"
+        - name: CUDA_LAUNCH_BLOCKING
+          value: "0"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: false  # CUDA needs write access
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "32Gi"
+            cpu: "8000m"
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: tmp
+          mountPath: /tmp
+        - name: cuda-cache
+          mountPath: /tmp/cuda-cache
+        - name: nvidia-dev
+          mountPath: /dev/nvidia0
+          readOnly: false
+        - name: nvidia-uvm
+          mountPath: /dev/nvidia-uvm
+          readOnly: false
+        - name: nvidia-ctl
+          mountPath: /dev/nvidiactl
+          readOnly: false
+        - name: ollama-config
+          mountPath: /etc/ollama
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/version
+            port: 11434
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/version
+            port: 11434
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: ollama-nvidia-models-pvc
+      - name: tmp
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: cuda-cache
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: nvidia-dev
+        hostPath:
+          path: /dev/nvidia0
+          type: CharDevice
+      - name: nvidia-uvm
+        hostPath:
+          path: /dev/nvidia-uvm
+          type: CharDevice
+      - name: nvidia-ctl
+        hostPath:
+          path: /dev/nvidiactl
+          type: CharDevice
+      - name: ollama-config
+        configMap:
+          name: ollama-nvidia-config
+          defaultMode: 0644
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-nvidia-service
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: nvidia
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+    gpu-type: nvidia
+  ports:
+  - name: http
+    port: 11434
+    targetPort: 11434
+    protocol: TCP
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-nvidia-config
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: nvidia
+data:
+  ollama.conf: |
+    # Ollama configuration for NVIDIA GPU
+    OLLAMA_HOST=0.0.0.0:11434
+    OLLAMA_MODELS=/models
+    OLLAMA_KEEP_ALIVE=24h
+    OLLAMA_MAX_LOADED_MODELS=3
+    OLLAMA_NUM_PARALLEL=4
+    OLLAMA_MAX_QUEUE=512
+    
+    # NVIDIA GPU settings
+    NVIDIA_VISIBLE_DEVICES=all
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    CUDA_VISIBLE_DEVICES=all
+    
+    # Performance tuning
+    OLLAMA_FLASH_ATTENTION=1
+    OLLAMA_TENSOR_PARALLEL_SIZE=1
+    OLLAMA_MAX_BATCH_SIZE=64
+    GPU_MEMORY_FRACTION=0.9
+  
+  gpu-info.sh: |
+    #!/bin/bash
+    echo "=== NVIDIA GPU Information ==="
+    nvidia-smi
+    echo "=== CUDA Version ==="
+    nvcc --version
+    echo "=== Available GPUs ==="
+    nvidia-smi -L
+    echo "=== GPU Memory Usage ==="
+    nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv
+  
+  benchmark.sh: |
+    #!/bin/bash
+    echo "=== Ollama Performance Test ==="
+    curl -X POST http://localhost:11434/api/generate -d '{
+      "model": "llama3",
+      "prompt": "Generate a simple benchmark test",
+      "stream": false
+    }'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-nvidia-models-pvc
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: nvidia
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd  # Adjust based on your storage class
+  resources:
+    requests:
+      storage: 100Gi  # Larger for NVIDIA setups
+  volumeMode: Filesystem
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ollama-nvidia-pdb
+  namespace: sow-template-service
+spec:
+  minAvailable: 0  # Allow disruption since it's single replica
+  selector:
+    matchLabels:
+      app: ollama
+      gpu-type: nvidia
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ollama-nvidia-hpa
+  namespace: sow-template-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ollama-nvidia
+  minReplicas: 1
+  maxReplicas: 1  # GPU workloads typically don't scale horizontally
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-nvidia-model-preload
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: nvidia
+    job-type: model-preload
+spec:
+  template:
+    metadata:
+      labels:
+        app: ollama
+        gpu-type: nvidia
+        job-type: model-preload
+    spec:
+      serviceAccountName: sow-service-account
+      restartPolicy: OnFailure
+      containers:
+      - name: model-preloader
+        image: ollama-nvidia:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for Ollama service to be ready..."
+          until curl -f http://ollama-nvidia-service:11434/api/version; do
+            sleep 5
+          done
+          
+          echo "Preloading llama3 model..."
+          ollama pull llama3
+          
+          echo "Model preloading completed"
+        env:
+        - name: OLLAMA_HOST
+          value: "http://ollama-nvidia-service:11434"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      backoffLimit: 3
+      activeDeadlineSeconds: 1800  # 30 minutes timeout

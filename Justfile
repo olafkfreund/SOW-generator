@@ -44,9 +44,15 @@ build-docker-ollama-amd:
 build-docker-ollama-nvidia:
 	docker build -f deployment/Dockerfile.ollama.nvidia -t ollama-nvidia:latest .
 
+build-docker-ollama-intel:
+	docker build -f deployment/Dockerfile.ollama.intel -t ollama-intel:latest .
+
 # Kubernetes
 k8s-apply:
 	kubectl apply -f deployment/k8s-pod.yaml
+
+k8s-deploy-intel:
+    kubectl apply -f deployment/ollama-intel-deployment.yaml
 
 # All
 install:

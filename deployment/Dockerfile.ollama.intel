@@ -1,0 +1,94 @@
+# Ollama Dockerfile (Intel GPU/NPU/Optimized CPU)
+FROM ubuntu:24.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV INTEL_DEVICE_ID=all
+ENV ONEAPI_ROOT=/opt/intel/oneapi
+ENV MKL_NUM_THREADS=auto
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    ca-certificates \
+    apt-transport-https \
+    build-essential \
+    cmake \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Intel OneAPI Base Toolkit (for GPU and optimized CPU)
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list && \
+    apt-get update && \
+    apt-get install -y \
+    intel-basekit \
+    intel-oneapi-runtime-libs \
+    intel-oneapi-mkl \
+    intel-oneapi-mkl-devel \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Intel GPU drivers for Arc/Iris Xe
+RUN wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy main" | tee /etc/apt/sources.list.d/intel-gpu-jammy.list && \
+    apt-get update && \
+    apt-get install -y \
+    intel-opencl-icd \
+    intel-level-zero-gpu \
+    level-zero \
+    intel-media-va-driver-non-free \
+    libmfx1 \
+    libmfxgen1 \
+    libvpl2 \
+    libegl-mesa0 \
+    libegl1-mesa \
+    libegl1-mesa-dev \
+    libgbm1 \
+    libgl1-mesa-dev \
+    libgl1-mesa-dri \
+    libglapi-mesa \
+    libgles2-mesa-dev \
+    libglx-mesa0 \
+    libigdgmm12 \
+    libxatracker2 \
+    mesa-va-drivers \
+    mesa-vdpau-drivers \
+    mesa-vulkan-drivers \
+    va-driver-all \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Intel OneAPI environment
+RUN echo 'source /opt/intel/oneapi/setvars.sh' >> /etc/bash.bashrc
+
+# Create ollama user
+RUN useradd -m -u 1000 ollama && \
+    mkdir -p /usr/share/ollama/.ollama && \
+    chown -R ollama:ollama /usr/share/ollama && \
+    usermod -a -G render,video ollama
+
+# Install Ollama
+RUN curl -fsSL https://ollama.ai/install.sh | sh
+
+# Set up model storage directory
+VOLUME ["/home/ollama/.ollama"]
+
+# Switch to ollama user
+USER ollama
+WORKDIR /usr/share/ollama
+
+# Source Intel OneAPI environment
+RUN echo 'source /opt/intel/oneapi/setvars.sh' >> ~/.bashrc
+
+# Expose Ollama port
+EXPOSE 11434
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# Start Ollama server with Intel optimizations
+CMD ["/bin/bash", "-c", "source /opt/intel/oneapi/setvars.sh && ollama serve"]

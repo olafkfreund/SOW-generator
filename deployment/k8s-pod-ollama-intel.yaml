@@ -1,0 +1,93 @@
+# ollama-intel-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-intel
+  namespace: sow-template-service
+  labels:
+    app: ollama
+    gpu-type: intel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+      gpu-type: intel
+  template:
+    metadata:
+      labels:
+        app: ollama
+        gpu-type: intel
+    spec:
+      serviceAccountName: sow-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: ollama
+        image: ollama-intel:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 11434
+          name: http
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0:11434"
+        - name: OLLAMA_MODELS
+          value: "/models"
+        - name: INTEL_DEVICE_ID
+          value: "all"
+        - name: ONEAPI_ROOT
+          value: "/opt/intel/oneapi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            gpu.intel.com/i915: 1  # Intel GPU resource
+          limits:
+            memory: "16Gi"
+            cpu: "8000m"
+            gpu.intel.com/i915: 1
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: tmp
+          mountPath: /tmp
+        - name: dev-dri
+          mountPath: /dev/dri
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 20
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: ollama-models-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: dev-dri
+        hostPath:
+          path: /dev/dri
+      nodeSelector:
+        gpu.intel.com/gpu.present: "true"
+      tolerations:
+      - key: gpu.intel.com/gpu
+        operator: Exists
+        effect: NoSchedule

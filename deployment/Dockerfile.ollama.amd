@@ -1,7 +1,54 @@
 # Ollama Dockerfile (AMD GPU)
-# Placeholder: Replace with actual Ollama AMD GPU Dockerfile instructions
-FROM ubuntu:22.04
-# Install Ollama and AMD ROCm drivers here
-# Expose Ollama port (e.g., 11434)
+FROM ubuntu:24.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV HIP_VISIBLE_DEVICES=all
+ENV ROC_ENABLE_PRE_VEGA=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    ca-certificates \
+    apt-transport-https \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ROCm for AMD GPU support
+RUN wget -q -O - https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - && \
+    echo 'deb [arch=amd64] https://repo.radeon.com/rocm/apt/6.0.2 jammy main' | tee /etc/apt/sources.list.d/rocm.list && \
+    apt-get update && \
+    apt-get install -y \
+    rocm-dev \
+    rocm-libs \
+    rocm-utils \
+    hip-runtime-amd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create ollama user
+RUN useradd -m -u 1000 ollama && \
+    mkdir -p /usr/share/ollama/.ollama && \
+    chown -R ollama:ollama /usr/share/ollama
+
+# Install Ollama
+RUN curl -fsSL https://ollama.ai/install.sh | sh
+
+# Set up model storage directory
+VOLUME ["/root/.ollama"]
+
+# Switch to ollama user
+USER ollama
+WORKDIR /usr/share/ollama
+
+# Expose Ollama port
 EXPOSE 11434
-CMD ["ollama", "serve", "--port", "11434"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# Start Ollama server
+CMD ["ollama", "serve"]

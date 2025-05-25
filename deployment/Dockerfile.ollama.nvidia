@@ -1,7 +1,51 @@
 # Ollama Dockerfile (Nvidia GPU)
-# Placeholder: Replace with actual Ollama Nvidia GPU Dockerfile instructions
-FROM nvidia/cuda:12.2.0-base-ubuntu22.04
-# Install Ollama and Nvidia CUDA drivers here
-# Expose Ollama port (e.g., 11434)
+FROM nvidia/cuda:12.4-base-ubuntu24.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV CUDA_VISIBLE_DEVICES=all
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    ca-certificates \
+    apt-transport-https \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install NVIDIA Container Toolkit dependencies
+RUN apt-get update && apt-get install -y \
+    nvidia-container-toolkit-base \
+    libnvidia-container-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create ollama user
+RUN useradd -m -u 1000 ollama && \
+    mkdir -p /usr/share/ollama/.ollama && \
+    chown -R ollama:ollama /usr/share/ollama
+
+# Install Ollama
+RUN curl -fsSL https://ollama.ai/install.sh | sh
+
+# Set up model storage directory
+VOLUME ["/root/.ollama"]
+
+# Switch to ollama user
+USER ollama
+WORKDIR /usr/share/ollama
+
+# Expose Ollama port
 EXPOSE 11434
-CMD ["ollama", "serve", "--port", "11434"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# Start Ollama server
+CMD ["ollama", "serve"]
